@@ -10,3 +10,6 @@ raw/
 reference/
 *.DNG
 *.dng
+
+# 기준선 측정용 사진 복사본(data/photos와 중복)
+baseline_photos/
