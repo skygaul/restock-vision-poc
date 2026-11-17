@@ -92,6 +92,15 @@ def score(files, gt, pred, include_other):
         detail1.append({"file": fn, "gt": g, "pred": q, "tol": round(tol, 2), "ok": ok})
     res["S1"] = {"ok": ok1, "of": len(files), "photos": detail1}
 
+    # 참고 지표 S1-8 (사후 추가): 8종 합계만으로 같은 허용 오차를 적용. 정답의 '기타' 칸은 사람이
+    # 모든 기타 용기를 센 것이 아니라 일부만 센 값이라, 기타를 뺀 합계도 함께 본다. 성공 판정에는 쓰지 않는다.
+    ok18 = 0
+    for fn in files:
+        g8 = sum(gt[fn].get(p, 0) for p in PRODUCTS)
+        q8 = sum(pred[fn].get(p, 0) for p in PRODUCTS)
+        ok18 += abs(q8 - g8) <= max(1.0, 0.1 * g8)
+    res["S1_8_reference"] = {"ok": ok18, "of": len(files)}
+
     # S2, S4 제품 칸
     main, small, boundary = [], [], []
     for fn in files:
@@ -179,6 +188,7 @@ def main():
         r = results[name]
         print(f"\n## {label} — {r['n_photos']}장")
         print(f"- S1 총 개수: {r['S1']['ok']}/{r['S1']['of']}장")
+        print(f"- (참고·사후 추가) S1-8 8종 합계만: {r['S1_8_reference']['ok']}/{r['S1_8_reference']['of']}장")
         s2, s4 = r["S2"], r["S4"]
         print(f"- S2 제품별(±1): {s2['ok']}/{s2['of']}칸 ({s2['rate']})   * P4·P6·경계 칸 제외")
         print(f"- S4 발주 일치: {s4['ok']}/{s4['of']}칸 ({s4['rate']})")
