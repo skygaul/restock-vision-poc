@@ -1,0 +1,4 @@
+후보,"평가셋 S1(총 개수, /12)",평가셋 S2(제품별),평가셋 S4(발주),"평가셋 S5(과다, 대략치)",개발셋 S2,모델 시간 12장 합계(초),S1 통과,S2 통과,S4 통과
+A YOLO11 + SigLIP 2,3,0.381,0.714,45,0.722,3.5,False,False,False
+A2 YOLO-World + SigLIP 2,1,0.3,0.6,80,0.722,3.8,False,False,False
+B SAM 2 + SigLIP 2,1,0.478,0.696,80,0.722,53.0,False,False,False
