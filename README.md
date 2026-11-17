@@ -37,4 +37,12 @@ python scripts/prepare_photos.py "<원본 사진 폴더>"
 
 ## 실행 방법
 
-Colab 노트북으로 제공할 예정입니다.
+Colab에서 후보 비교 노트북을 엽니다: [01_candidate_comparison.ipynb](https://colab.research.google.com/github/skygaul/restock-vision-poc/blob/main/notebooks/01_candidate_comparison.ipynb)
+
+1. 런타임 → 런타임 유형 변경 → **T4 GPU**
+2. 위에서부터 셀을 차례로 실행(저장소를 자동으로 내려받고 필요한 패키지를 설치합니다)
+3. 개발셋(쉬움 8장)에서 값을 정하고 `results/chosen_params.json`에 저장 → 같은 값으로 평가셋(12장) 판정
+
+> 노트북은 작성 후 아직 Colab에서 실행해 확인하지 않았습니다.
+
+지표는 `python scripts/evaluate.py <예측 CSV>`로 계산합니다(사람 기준선은 `--no-other`).

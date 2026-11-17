@@ -25,7 +25,10 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-sys.stdout.reconfigure(encoding="utf-8")
+try:  # Colab·Jupyter의 출력 객체에는 reconfigure가 없을 수 있다
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTS = [f"P{i}" for i in range(1, 9)]
