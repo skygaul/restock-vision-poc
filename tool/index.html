@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>재고 사진 개수 확인 도구</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #1c2330; --muted: #667085; --line: #dfe3ea;
+    --accent: #2563eb; --ok: #16a34a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11151c; --panel: #1a202b; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2b3342; --accent: #6ea0ff; --ok: #4ade80; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.5 "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif; }
+  .app { display: grid; grid-template-columns: 210px 1fr 300px; height: 100vh; }
+  aside, .side { background: var(--panel); overflow-y: auto; }
+  #list { border-right: 1px solid var(--line); padding: 8px; }
+  #info { border-left: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  h1 { font-size: 15px; margin: 0; }
+  h2 { font-size: 12px; margin: 0 0 6px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+  .item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+  .item:hover { background: var(--bg); }
+  .item.active { border-color: var(--accent); background: var(--bg); }
+  .item .nm { font-weight: 600; }
+  .item .sub { color: var(--muted); font-size: 12px; }
+  .item .chk { margin-left: auto; color: var(--ok); font-weight: 700; }
+  .tag { font-size: 11px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+  main { position: relative; min-width: 0; }
+  #stage { position: absolute; inset: 0; background: #0d1117; }
+  canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: rgba(0,0,0,.78); color: #fff; padding: 6px 12px; border-radius: 99px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  .prod { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); margin-bottom: 5px; cursor: pointer; }
+  .prod.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+  .prod .k { color: var(--muted); font-size: 11px; }
+  .prod .n { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; text-align: right; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  #timer { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rule { font-size: 12px; color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+  .rule b { color: var(--ink); }
+  kbd { font: 11px ui-monospace, Consolas, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--bg); }
+  .total { display: flex; justify-content: space-between; font-weight: 700; padding: 4px 8px; }
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; height: auto; } #list { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); } .item { flex: 0 0 auto; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="list"></aside>
+  <main>
+    <div id="stage"><canvas id="cv"></canvas></div>
+    <div id="toast"></div>
+  </main>
+  <div class="side" id="info">
+    <div>
+      <h1 id="title">-</h1>
+      <div class="sub" id="meta" style="color:var(--muted);font-size:12px"></div>
+    </div>
+    <div>
+      <h2>제품 선택 후 용기를 클릭 (숫자 키 <kbd>1</kbd>~<kbd>8</kbd>, 기타 <kbd>0</kbd>)</h2>
+      <div id="prods"></div>
+      <div class="total"><span>합계</span><span id="total">0</span></div>
+    </div>
+    <div>
+      <h2>걸린 시간 (이 사진)</h2>
+      <div class="row" style="align-items:center">
+        <div id="timer">00:00</div>
+        <button id="pause">일시정지</button>
+      </div>
+    </div>
+    <div class="row">
+      <button id="undo">되돌리기 <kbd>Z</kbd></button>
+      <button id="fit">화면에 맞추기 <kbd>F</kbd></button>
+      <button id="done" class="primary">완료 → 다음 <kbd>Enter</kbd></button>
+    </div>
+    <div class="rule">
+      <b>세는 기준</b><br>
+      용기 몸통이 <b>절반 이상</b> 보이면 센다.<br>
+      뒷줄에 윗면만 보이는 캔, 눕혀진 캔은 <b>세지 않는다</b>.<br>
+      8종이 아닌 제품은 <b>기타(0)</b>로 센다.<br>
+      카스·테라는 <b>500ml 캔만</b> 3·4번. 355ml·453ml 캔과 라이트류는 <b>기타(0)</b>. (가격표·캔 하단 용량 표기로 확인)<br>
+      코카콜라 오리지널은 <b>355ml 캔만</b> 5번. 250ml 슬림 캔은 <b>기타(0)</b>.<br>
+      코카콜라 제로는 <b>250ml 캔만</b> 6번. 제로 페트는 <b>기타(0)</b>.<br>
+      칠성사이다는 <b>250ml 캔만</b> 7번. 제로(검정 캔)·다른 용량·대형 페트는 <b>기타(0)</b>.<br>
+      <span style="display:block;margin-top:4px">왼쪽 클릭 추가 · 오른쪽 클릭(또는 <kbd>Shift</kbd>+클릭) 가까운 점 삭제 · 휠 확대 · 드래그 이동</span>
+    </div>
+    <div>
+      <h2>저장 (CSV는 브라우저가 다운로드 폴더에 저장)</h2>
+      <div class="row">
+        <button id="exp-gt">정답 CSV</button>
+        <button id="exp-time">시간 CSV</button>
+        <button id="exp-json">점 JSON</button>
+      </div>
+      <div style="color:var(--muted);font-size:12px;margin-top:6px">내용은 이 브라우저에 자동 저장됩니다. 끝나면 CSV를 <code>data/</code> 폴더로 옮겨 주세요.</div>
+    </div>
+  </div>
+</div>
+
+<script src="photos.js"></script>
+<script>
+const PRODUCTS = [
+  { id: "P1", name: "참이슬", color: "#16a34a", key: "1" },
+  { id: "P2", name: "처음처럼", color: "#84cc16", key: "2" },
+  { id: "P3", name: "카스 500ml 캔", color: "#2563eb", key: "3" },
+  { id: "P4", name: "테라 500ml 캔", color: "#0d9488", key: "4" },
+  { id: "P5", name: "코카콜라 355ml 캔", color: "#dc2626", key: "5" },
+  { id: "P6", name: "코카콜라 제로 250ml 캔", color: "#111827", key: "6" },
+  { id: "P7", name: "칠성사이다 250ml 캔", color: "#f59e0b", key: "7" },
+  { id: "P8", name: "코카콜라 페트 500ml", color: "#db2777", key: "8" },
+  { id: "other", name: "기타(8종 외)", color: "#6b7280", key: "0" },
+];
+const KEY = "restock-counter-v1";
+const $ = (s) => document.querySelector(s);
+
+function load() {
+  try { const j = JSON.parse(localStorage.getItem(KEY)); if (j && j.marks) return j; } catch (e) {}
+  return { idx: 0, marks: {}, secs: {}, done: {} };
+}
+let S = load();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+let sel = 0;               // 선택된 제품 index
+let img = null, view = { s: 1, ox: 0, oy: 0 };
+let running = true, last = performance.now(), sinceSave = 0;
+
+const cv = $("#cv"), ctx = cv.getContext("2d");
+const cur = () => PHOTOS[S.idx];
+const marks = () => (S.marks[cur().file] = S.marks[cur().file] || []);
+
+function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 1300); }
+function fmt(sec) { sec = Math.round(sec); return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0"); }
+
+function resize() {
+  const r = cv.parentElement.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, r.width * d); cv.height = Math.max(1, r.height * d);
+  draw();
+}
+function fit() {
+  if (!img) return;
+  const r = cv.parentElement.getBoundingClientRect();
+  const s = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight);
+  view = { s, ox: (r.width - img.naturalWidth * s) / 2, oy: (r.height - img.naturalHeight * s) / 2 };
+  draw();
+}
+function draw() {
+  const d = window.devicePixelRatio || 1;
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!img || !img.complete) return;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, view.ox, view.oy, img.naturalWidth * view.s, img.naturalHeight * view.s);
+  for (const m of marks()) {
+    const p = PRODUCTS.find((q) => q.id === m.p) || PRODUCTS[8];
+    const x = view.ox + m.x * img.naturalWidth * view.s, y = view.oy + m.y * img.naturalHeight * view.s;
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = "#fff"; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(p.key, x, y + 0.5);
+  }
+}
+function toImg(px, py) { return { x: (px - view.ox) / (img.naturalWidth * view.s), y: (py - view.oy) / (img.naturalHeight * view.s) }; }
+function fromImg(m) { return { x: view.ox + m.x * img.naturalWidth * view.s, y: view.oy + m.y * img.naturalHeight * view.s }; }
+
+function counts() {
+  const c = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
+  for (const m of marks()) c[m.p] = (c[m.p] || 0) + 1;
+  return c;
+}
+function renderProds() {
+  const c = counts(); let tot = 0;
+  $("#prods").innerHTML = PRODUCTS.map((p, i) =>
+    `<div class="prod ${i === sel ? "sel" : ""}" data-i="${i}">
+       <span class="dot" style="background:${p.color}"></span>
+       <span>${p.name} <span class="k">[${p.key}]</span></span>
+       <span class="n">${c[p.id]}</span></div>`).join("");
+  PRODUCTS.forEach((p) => (tot += c[p.id]));
+  $("#total").textContent = tot;
+  document.querySelectorAll(".prod").forEach((e) => (e.onclick = () => { sel = +e.dataset.i; renderProds(); }));
+}
+function renderList() {
+  $("#list").innerHTML = PHOTOS.map((p, i) => {
+    const n = (S.marks[p.file] || []).length;
+    return `<div class="item ${i === S.idx ? "active" : ""}" data-i="${i}">
+      <div><div class="nm">${p.file.replace("IMG_", "")}</div><div class="sub">${p.scene} · <span class="tag">${p.difficulty}</span> · ${n}개</div></div>
+      <span class="chk">${S.done[p.file] ? "✓" : ""}</span></div>`;
+  }).join("");
+  document.querySelectorAll(".item").forEach((e) => (e.onclick = () => openPhoto(+e.dataset.i)));
+  const act = document.querySelector(".item.active"); if (act) act.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+function renderInfo() {
+  const p = cur(), doneCount = PHOTOS.filter((q) => S.done[q.file]).length;
+  $("#title").textContent = `${p.file} (${S.idx + 1}/${PHOTOS.length})`;
+  $("#meta").textContent = `장면 ${p.scene} · ${p.difficulty} · 완료 ${doneCount}/${PHOTOS.length}`;
+  $("#timer").textContent = fmt(S.secs[p.file] || 0);
+  $("#pause").textContent = running ? "일시정지" : "시작";
+  $("#done").textContent = S.done[p.file] ? "다음 사진 →" : "완료 → 다음 (Enter)";
+}
+function renderAll() { renderProds(); renderList(); renderInfo(); draw(); }
+
+function openPhoto(i) {
+  S.idx = Math.max(0, Math.min(PHOTOS.length - 1, i)); save();
+  img = new Image();
+  img.onload = () => { fit(); };
+  img.src = cur().src;
+  running = !S.done[cur().file]; last = performance.now();
+  renderAll();
+}
+
+// 클릭·드래그·확대
+let drag = null;
+cv.addEventListener("pointerdown", (e) => { cv.setPointerCapture(e.pointerId); drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, moved: false, btn: e.button }; });
+cv.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.hypot(dx, dy) > 4) drag.moved = true;
+  if (drag.moved && drag.btn === 0) { view.ox = drag.ox + dx; view.oy = drag.oy + dy; draw(); }
+});
+cv.addEventListener("pointerup", (e) => {
+  const d = drag; drag = null;
+  if (!d || d.moved || d.btn !== 0 || !img) return;
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (e.shiftKey) { removeNear(px, py); return; }
+  const q = toImg(px, py);
+  if (q.x < 0 || q.y < 0 || q.x > 1 || q.y > 1) return;
+  if (S.done[cur().file]) { S.done[cur().file] = false; running = true; last = performance.now(); }
+  marks().push({ x: +q.x.toFixed(5), y: +q.y.toFixed(5), p: PRODUCTS[sel].id });
+  save(); renderAll();
+});
+cv.addEventListener("contextmenu", (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(); removeNear(e.clientX - r.left, e.clientY - r.top); });
+function removeNear(px, py) {
+  let bi = -1, bd = 22;
+  marks().forEach((m, i) => { const p = fromImg(m), d = Math.hypot(p.x - px, p.y - py); if (d < bd) { bd = d; bi = i; } });
+  if (bi >= 0) { marks().splice(bi, 1); save(); renderAll(); }
+}
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  zoomAt(px, py, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+}, { passive: false });
+function zoomAt(px, py, f) {
+  const ns = Math.max(0.05, Math.min(8, view.s * f)), k = ns / view.s;
+  view.ox = px - (px - view.ox) * k; view.oy = py - (py - view.oy) * k; view.s = ns; draw();
+}
+
+function undo() { const m = marks(); if (m.length) { m.pop(); save(); renderAll(); } }
+function finish() {
+  const f = cur().file;
+  if (!S.done[f]) { S.done[f] = true; running = false; save(); toast(`${f}: ${marks().length}개로 완료`); }
+  if (S.idx < PHOTOS.length - 1) openPhoto(S.idx + 1); else { renderAll(); toast("마지막 사진입니다. CSV를 저장하세요"); }
+}
+$("#undo").onclick = undo; $("#fit").onclick = fit; $("#done").onclick = finish;
+$("#pause").onclick = () => { running = !running; last = performance.now(); renderInfo(); };
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } return; }
+  const k = e.key;
+  const pi = PRODUCTS.findIndex((p) => p.key === k);
+  if (pi >= 0) { sel = pi; renderProds(); return; }
+  if (k.toLowerCase() === "z") undo();
+  else if (k === "Enter") finish();
+  else if (k === "ArrowRight") openPhoto(S.idx + 1);
+  else if (k === "ArrowLeft") openPhoto(S.idx - 1);
+  else if (k.toLowerCase() === "f") fit();
+  else if (k.toLowerCase() === "p") $("#pause").click();
+  else if (k === "+" || k === "=") { const r = cv.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1.2); }
+  else if (k === "-") { const r = cv.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1 / 1.2); }
+});
+
+// 타이머
+setInterval(() => {
+  const now = performance.now(), dt = (now - last) / 1000; last = now;
+  if (running && !document.hidden && dt < 5) {
+    const f = cur().file; S.secs[f] = (S.secs[f] || 0) + dt; sinceSave += dt;
+    $("#timer").textContent = fmt(S.secs[f]);
+    if (sinceSave > 5) { save(); sinceSave = 0; }
+  }
+}, 250);
+
+// 내보내기
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: type || "text/csv;charset=utf-8" }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+$("#exp-gt").onclick = () => {
+  const rows = ["file,difficulty,product,visible_count,status"];
+  let n = 0;
+  for (const p of PHOTOS) {
+    if (!S.done[p.file]) continue; n++;
+    const c = {}; (S.marks[p.file] || []).forEach((m) => (c[m.p] = (c[m.p] || 0) + 1));
+    for (const q of PRODUCTS) if (c[q.id]) rows.push(`${p.file},${p.difficulty},${q.id},${c[q.id]},human`);
+  }
+  download("ground_truth_human.csv", rows.join("\n") + "\n");
+  toast(`완료한 ${n}장을 저장했습니다 (0개인 제품은 행이 없습니다)`);
+};
+$("#exp-time").onclick = () => {
+  const rows = ["file,difficulty,seconds,marks"];
+  for (const p of PHOTOS) if (S.done[p.file]) rows.push(`${p.file},${p.difficulty},${Math.round(S.secs[p.file] || 0)},${(S.marks[p.file] || []).length}`);
+  download("human_count_time.csv", rows.join("\n") + "\n");
+};
+$("#exp-json").onclick = () => download("count_marks.json", JSON.stringify({ products: PRODUCTS.map(({ id, name }) => ({ id, name })), marks: S.marks }, null, 1), "application/json");
+
+new ResizeObserver(resize).observe(cv.parentElement);
+document.addEventListener("visibilitychange", () => { last = performance.now(); });
+openPhoto(S.idx);
+</script>
+</body>
+</html>

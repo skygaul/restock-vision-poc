@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+.env
+.claude/
+# 원본 사진(DNG)과 출처 불명 참고 이미지는 저장소에 넣지 않는다
+raw/
+reference/
+*.DNG
+*.dng
